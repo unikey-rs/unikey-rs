@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=UniKey RS
+GenericName=Multi-layout Text Composer
+Comment=Compose Vietnamese Telex, VNI, and VIQR on Wayland
+Exec=unikey-rs gui
+Icon=unikey-rs
+Terminal=false
+Categories=Utility;TextTools;
+Keywords=Vietnamese;Telex;VNI;VIQR;Wayland;Keyboard;
+StartupNotify=true

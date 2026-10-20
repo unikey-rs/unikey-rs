@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.unikeyrs.UniKeyRS</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>UniKey RS</name>
+  <url type="homepage">https://github.com/unikey-rs/unikey-rs</url>
+  <developer id="org.unikeyrs"><name>UniKey RS contributors</name></developer>
+  <content_rating type="oars-1.1" />
+  <summary>Multi-layout text composer for Wayland</summary>
+  <description>
+    <p>Compose Vietnamese text with Telex, VNI, or VIQR through a unified Rust CLI and native Wayland GUI.</p>
+  </description>
+  <launchable type="desktop-id">unikey-rs.desktop</launchable>
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <releases>
+    <release version="0.1.0" date="2026-10-20"/>
+  </releases>
+</component>

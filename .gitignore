@@ -1,0 +1,9 @@
+/target/
+/dist/
+*.AppImage
+*.AppDir
+.DS_Store
+.claude/
+opencode.json
+.ignore
+.trail/
