@@ -4,7 +4,7 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <name>UniKey RS</name>
-  <url type="homepage">https://github.com</url>
+  <url type="homepage">https://github.com/unikey-rs/unikey-rs</url>
   <developer id="org.unikeyrs"><name>UniKey RS contributors</name></developer>
   <content_rating type="oars-1.1" />
   <summary>Multi-layout text composer for Wayland</summary>
