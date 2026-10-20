@@ -6,4 +6,5 @@
 .claude/
 opencode.json
 .ignore
-.trail/
+.trail/cache/
+.trail/hook.cjs

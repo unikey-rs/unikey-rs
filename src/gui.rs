@@ -206,7 +206,7 @@ fn redraw(connection: &mut Connection, state: &GuiState, surface_id: u32, shm_id
 }
 
 fn create_buffer(connection: &mut Connection, shm_id: u32, pixels: &[u8]) -> io::Result<u32> {
-    let path = std::env::temp_dir().join(format!("unikey-rs-{}-{}.shm", std::process::id(), connection.alloc_id()));
+    let path = std::env::temp_dir().join(format!("unikey-rs-{}-{}.shm", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos()));
     let mut file = OpenOptions::new().create(true).truncate(true).read(true).write(true).open(&path)?;
     file.set_len(pixels.len() as u64)?;
     file.write_all(pixels)?;

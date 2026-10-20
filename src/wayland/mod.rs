@@ -168,11 +168,20 @@ impl Connection {
         message.extend_from_slice(&length.to_le_bytes());
         message.extend_from_slice(&encoder.body);
 
-        if encoder.fds.is_empty() {
+        if std::env::var_os("UNIKEY_RS_DEBUG_WAYLAND").is_some() {
+            eprintln!("send object={object} opcode={opcode} body_len={} fds={:?}", encoder.body.len(), encoder.fds);
+        }
+        let result = if encoder.fds.is_empty() {
             self.stream.write_all(&message)
         } else {
             send_with_fds(&self.stream, &message, &encoder.fds)
-        }
+        };
+        result.map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!("Wayland send object={object} opcode={opcode}: {error}"),
+            )
+        })
     }
 
     pub fn recv(&mut self) -> io::Result<Event> {
@@ -186,6 +195,16 @@ impl Connection {
         }
         let mut body = vec![0; length - 8];
         self.stream.read_exact(&mut body)?;
+        if object == DISPLAY_OBJECT && opcode == 0 {
+            let mut decoder = Decoder::new(&body);
+            let error_object = decoder.u32()?;
+            let code = decoder.u32()?;
+            let message = decoder.string()?;
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Wayland protocol error on object {error_object}, code {code}: {message}"),
+            ));
+        }
         Ok(Event { object, opcode, body })
     }
 
@@ -273,12 +292,17 @@ fn send_with_fds(stream: &UnixStream, message: &[u8], fds: &[i32]) -> io::Result
     if fds.len() != 1 {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "only one Wayland fd per message is supported"));
     }
-    let mut control = [0u8; 64];
+    // `cmsghdr` is pointer-aligned on Linux; an unaligned byte buffer makes
+    // `sendmsg` reject the control block with EINVAL.
+    let mut control = [0usize; 8];
+    let control_bytes = unsafe {
+        std::slice::from_raw_parts_mut(control.as_mut_ptr().cast::<u8>(), std::mem::size_of::<[usize; 8]>())
+    };
     let cmsg_len = 20usize;
-    control[0..8].copy_from_slice(&cmsg_len.to_ne_bytes());
-    control[8..12].copy_from_slice(&1i32.to_ne_bytes()); // SOL_SOCKET
-    control[12..16].copy_from_slice(&1i32.to_ne_bytes()); // SCM_RIGHTS
-    control[16..20].copy_from_slice(&fds[0].to_ne_bytes());
+    control_bytes[0..8].copy_from_slice(&cmsg_len.to_ne_bytes());
+    control_bytes[8..12].copy_from_slice(&1i32.to_ne_bytes()); // SOL_SOCKET
+    control_bytes[12..16].copy_from_slice(&1i32.to_ne_bytes()); // SCM_RIGHTS
+    control_bytes[16..20].copy_from_slice(&fds[0].to_ne_bytes());
 
     let iov = Iovec {
         base: message.as_ptr(),
@@ -289,8 +313,8 @@ fn send_with_fds(stream: &UnixStream, message: &[u8], fds: &[i32]) -> io::Result
         name_len: 0,
         iov: &iov,
         iov_len: 1,
-        control: control.as_mut_ptr(),
-        control_len: control.len(),
+        control: control.as_mut_ptr().cast::<u8>(),
+        control_len: 24,
         flags: 0,
     };
 

@@ -18,7 +18,7 @@ chmod +x ~/.local/bin/UniKey_RS-0.1.0-x86_64.AppImage
 
 ```sh
 mkdir -p ~/.local/share/applications ~/.local/share/icons/hicolor/scalable/apps
-cp packaging/appdir/usr/share/applications/unikey-rs.desktop ~/.local/share/applications/
+cp packaging/appdir/usr/share/applications/org.unikeyrs.UniKeyRS.desktop ~/.local/share/applications/
 cp packaging/appdir/usr/share/icons/hicolor/scalable/apps/unikey-rs.svg ~/.local/share/icons/hicolor/scalable/apps/
 update-desktop-database ~/.local/share/applications 2>/dev/null || true
 gtk-update-icon-cache ~/.local/share/icons/hicolor 2>/dev/null || true

@@ -29,8 +29,8 @@ mkdir -p \
 )
 cp "$ROOT/target/$TARGET/release/unikey-rs" "$APPDIR/usr/bin/"
 cp "$ROOT/packaging/AppRun" "$APPDIR/AppRun"
-cp "$ROOT/packaging/unikey-rs.desktop" "$APPDIR/"
-cp "$ROOT/packaging/unikey-rs.desktop" "$APPDIR/usr/share/applications/"
+cp "$ROOT/packaging/org.unikeyrs.UniKeyRS.desktop" "$APPDIR/"
+cp "$ROOT/packaging/org.unikeyrs.UniKeyRS.desktop" "$APPDIR/usr/share/applications/"
 cp "$ROOT/packaging/unikey-rs.svg" "$APPDIR/unikey-rs.svg"
 cp "$ROOT/packaging/unikey-rs.svg" "$APPDIR/usr/share/icons/hicolor/scalable/apps/"
 cp "$ROOT/packaging/org.unikeyrs.UniKeyRS.appdata.xml" "$APPDIR/usr/share/metainfo/"
