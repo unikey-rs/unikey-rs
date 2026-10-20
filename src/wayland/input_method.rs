@@ -6,6 +6,7 @@
 //! the older context/keyboard-grab model.
 
 use crate::layout::{Composer, Layout};
+use crate::wayland::xkb::Keymap;
 use crate::wayland::{Connection, Decoder, Encoder, Event, Global};
 use std::io;
 
@@ -51,6 +52,7 @@ fn run_v1(layout: Layout) -> io::Result<()> {
         serial: 0,
         context: None,
         keyboard: None,
+        keymap: Keymap::default(),
         shift: false,
     };
 
@@ -66,6 +68,7 @@ struct V1State {
     serial: u32,
     context: Option<u32>,
     keyboard: Option<u32>,
+    keymap: Keymap,
     shift: bool,
 }
 
@@ -97,6 +100,11 @@ impl V1State {
                 4 => self.serial = Decoder::new(&event.body).u32()?,
                 _ => {}
             }
+            return Ok(());
+        }
+
+        if Some(event.object) == self.keyboard && event.opcode == 0 {
+            self.keymap = load_keymap(event)?;
             return Ok(());
         }
 
@@ -134,7 +142,7 @@ impl V1State {
             28 => self.commit_v1(connection, context, "\n")?,
             57 => self.commit_v1(connection, context, " ")?,
             _ => {
-                if let Some(ch) = key_to_char_with_shift(key, self.shift) {
+                if let Some(ch) = self.keymap.key_to_char(key, self.shift).or_else(|| key_to_char_with_shift(key, self.shift)) {
                     self.composer.push_char(ch);
                     if self.layout == Layout::English {
                         self.commit_v1(connection, context, &ch.to_string())?;
@@ -188,6 +196,7 @@ fn run_v2(layout: Layout) -> io::Result<()> {
         composer: Composer::new(layout),
         serial: 0,
         grab: None,
+        keymap: Keymap::default(),
         shift: false,
     };
 
@@ -202,6 +211,7 @@ struct V2State {
     composer: Composer,
     serial: u32,
     grab: Option<u32>,
+    keymap: Keymap,
     shift: bool,
 }
 
@@ -235,6 +245,7 @@ impl V2State {
 
         if Some(event.object) == self.grab {
             match event.opcode {
+                0 => self.keymap = load_keymap(event)?,
                 1 => {
                     let mut decoder = Decoder::new(&event.body);
                     let _serial = decoder.u32()?;
@@ -269,7 +280,7 @@ impl V2State {
             28 => self.commit_v2(connection, input_method_id, "\n")?,
             57 => self.commit_v2(connection, input_method_id, " ")?,
             _ => {
-                if let Some(ch) = key_to_char_with_shift(key, self.shift) {
+                if let Some(ch) = self.keymap.key_to_char(key, self.shift).or_else(|| key_to_char_with_shift(key, self.shift)) {
                     self.composer.push_char(ch);
                     if self.layout == Layout::English {
                         self.commit_v2(connection, input_method_id, &ch.to_string())?;
@@ -306,8 +317,22 @@ impl V2State {
     }
 }
 
-/// A small evdev/QWERTY map is sufficient until the xkbcommon backend is
-/// added; the protocol's keymap fd remains available for a future parser.
+/// Load the compositor-provided XKB keymap. The small evdev/QWERTY map below
+/// remains a fallback for `no_keymap` compositor test environments.
+pub fn load_keymap(event: Event) -> io::Result<Keymap> {
+    let Event { body, mut fds, .. } = event;
+    let mut decoder = Decoder::new(&body);
+    let format = decoder.u32()?;
+    let size = decoder.u32()? as usize;
+    if format != 0 {
+        return Ok(Keymap::default());
+    }
+    match fds.pop() {
+        Some(fd) => Keymap::from_fd(fd, size),
+        None => Ok(Keymap::default()),
+    }
+}
+
 pub fn key_to_char(key: u32) -> Option<char> {
     key_to_char_with_shift(key, false)
 }

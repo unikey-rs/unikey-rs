@@ -36,3 +36,10 @@ Ordinary Wayland clients cannot type into unrelated clients. That isolation is
 a feature. Do not add a root/evdev injector to bypass it; add a supported
 input-method, text-input, virtual-keyboard, or platform accessibility backend
 instead.
+
+## Keyboard maps
+
+Compositor XKB keymaps are parsed by `src/wayland/xkb.rs`. UniKey RS reads the
+keymap file descriptor delivered through SCM_RIGHTS and resolves the normal and
+Shift keysym levels. The built-in evdev/QWERTY map is used only when a keymap is
+missing or unsupported.

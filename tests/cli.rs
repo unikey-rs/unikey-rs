@@ -58,3 +58,33 @@ fn config_commands_round_trip_in_user_scope() {
     assert!(stdout(&output).contains("layout=vni"));
     let _ = std::fs::remove_file(path);
 }
+
+#[test]
+fn uses_saved_layout_when_flag_is_omitted() {
+    let path = std::env::temp_dir().join(format!("unikey-rs-default-layout-{}", std::process::id()));
+    let mut config = std::fs::File::create(&path).expect("create config");
+    config.write_all(b"layout=vni\nrestore_keys=true\n").expect("write config");
+
+    let output = binary()
+        .env("UNIKEY_RS_CONFIG", &path)
+        .args(["compose", "a61"])
+        .output()
+        .expect("compose with config");
+    assert_eq!(stdout(&output), "ấ\n");
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn respects_restore_keys_config() {
+    let path = std::env::temp_dir().join(format!("unikey-rs-restore-config-{}", std::process::id()));
+    let mut config = std::fs::File::create(&path).expect("create config");
+    config.write_all(b"layout=telex\nrestore_keys=false\n").expect("write config");
+
+    let output = binary()
+        .env("UNIKEY_RS_CONFIG", &path)
+        .args(["compose", "ass"])
+        .output()
+        .expect("compose restore config");
+    assert_eq!(stdout(&output), "ás\n");
+    let _ = std::fs::remove_file(path);
+}

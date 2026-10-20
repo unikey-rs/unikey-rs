@@ -6,9 +6,10 @@
 //! input-method v1 bridge.
 
 pub mod input_method;
+pub mod xkb;
 
 use std::io::{self, Read, Write};
-use std::os::fd::AsRawFd;
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 
@@ -23,11 +24,12 @@ pub struct Global {
     pub version: u32,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Event {
     pub object: u32,
     pub opcode: u16,
     pub body: Vec<u8>,
+    pub fds: Vec<OwnedFd>,
 }
 
 #[derive(Debug, Default)]
@@ -185,8 +187,7 @@ impl Connection {
     }
 
     pub fn recv(&mut self) -> io::Result<Event> {
-        let mut header = [0u8; 8];
-        self.stream.read_exact(&mut header)?;
+        let (header, fds) = recv_header(&mut self.stream)?;
         let object = u32::from_le_bytes(header[0..4].try_into().expect("object"));
         let opcode = u16::from_le_bytes(header[4..6].try_into().expect("opcode"));
         let length = u16::from_le_bytes(header[6..8].try_into().expect("length")) as usize;
@@ -205,7 +206,7 @@ impl Connection {
                 format!("Wayland protocol error on object {error_object}, code {code}: {message}"),
             ));
         }
-        Ok(Event { object, opcode, body })
+        Ok(Event { object, opcode, body, fds })
     }
 
     pub fn sync(&mut self) -> io::Result<()> {
@@ -286,6 +287,51 @@ struct Msghdr {
 
 extern "C" {
     fn sendmsg(fd: i32, message: *const Msghdr, flags: i32) -> isize;
+    fn recvmsg(fd: i32, message: *mut Msghdr, flags: i32) -> isize;
+}
+
+fn recv_header(stream: &mut UnixStream) -> io::Result<([u8; 8], Vec<OwnedFd>)> {
+    let mut header = [0u8; 8];
+    let iov = Iovec {
+        base: header.as_ptr(),
+        len: header.len(),
+    };
+    let mut control = [0usize; 3];
+    let mut message = Msghdr {
+        name: std::ptr::null_mut(),
+        name_len: 0,
+        iov: &iov,
+        iov_len: 1,
+        control: control.as_mut_ptr().cast::<u8>(),
+        control_len: 24,
+        flags: 0,
+    };
+    let received = unsafe { recvmsg(stream.as_raw_fd(), &mut message, 0) };
+    if received < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    let received = received as usize;
+    if received == 0 {
+        return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "Wayland socket closed"));
+    }
+    if received < header.len() {
+        stream.read_exact(&mut header[received..])?;
+    }
+
+    let mut fds = Vec::new();
+    if message.control_len >= 20 {
+        let control = unsafe {
+            std::slice::from_raw_parts(message.control, message.control_len)
+        };
+        let cmsg_len = usize::from_ne_bytes(control[0..8].try_into().expect("cmsg_len"));
+        let level = i32::from_ne_bytes(control[8..12].try_into().expect("level"));
+        let kind = i32::from_ne_bytes(control[12..16].try_into().expect("type"));
+        if cmsg_len >= 20 && level == 1 && kind == 1 {
+            let fd = i32::from_ne_bytes(control[16..20].try_into().expect("fd"));
+            fds.push(unsafe { OwnedFd::from_raw_fd(fd) });
+        }
+    }
+    Ok((header, fds))
 }
 
 fn send_with_fds(stream: &UnixStream, message: &[u8], fds: &[i32]) -> io::Result<()> {

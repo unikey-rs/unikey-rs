@@ -5,6 +5,7 @@
 //! runtime and the same layout engine can be exercised interactively.
 
 use crate::layout::{Composer, Layout};
+use crate::wayland::xkb::Keymap;
 use crate::wayland::{Connection, Decoder, Encoder, Event};
 use std::fs::OpenOptions;
 use std::io::{self, Write};
@@ -53,6 +54,8 @@ pub fn run(initial: Layout) -> io::Result<()> {
     let mut state = GuiState {
         composer: Composer::new(initial),
         layout: initial,
+        keymap: Keymap::default(),
+        shift: false,
         cursor_x: 0.0,
         cursor_y: 0.0,
         configured: false,
@@ -81,6 +84,8 @@ pub fn run(initial: Layout) -> io::Result<()> {
 struct GuiState {
     composer: Composer,
     layout: Layout,
+    keymap: Keymap,
+    shift: bool,
     cursor_x: f64,
     cursor_y: f64,
     configured: bool,
@@ -142,6 +147,22 @@ fn handle_event(
         return Ok(());
     }
 
+    if event.object == keyboard_id && event.opcode == 0 {
+        state.keymap = crate::wayland::input_method::load_keymap(event)?;
+        return Ok(());
+    }
+
+    if event.object == keyboard_id && event.opcode == 4 {
+        let mut decoder = Decoder::new(&event.body);
+        let _serial = decoder.u32()?;
+        let depressed = decoder.u32()?;
+        let _latched = decoder.u32()?;
+        let _locked = decoder.u32()?;
+        let _group = decoder.u32()?;
+        state.shift = depressed & 1 != 0;
+        return Ok(());
+    }
+
     if event.object == keyboard_id && event.opcode == 3 {
         let mut decoder = Decoder::new(&event.body);
         let _serial = decoder.u32()?;
@@ -188,7 +209,11 @@ fn key_press(connection: &mut Connection, state: &mut GuiState, key: u32, surfac
             state.composer.backspace();
         }
         _ => {
-            if let Some(ch) = crate::wayland::input_method::key_to_char(key) {
+            if let Some(ch) = state
+                .keymap
+                .key_to_char(key, state.shift)
+                .or_else(|| crate::wayland::input_method::key_to_char(key))
+            {
                 state.composer.push_char(ch);
             }
         }

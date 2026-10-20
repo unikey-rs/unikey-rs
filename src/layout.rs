@@ -353,9 +353,11 @@ fn apply_or_restore_tone(word: &mut [Unit], key: char, tone: Tone, restore_keys:
         last.tone = tone;
         last.tone_key = Some(key);
         true
-    } else if restore_keys && last.tone_key == Some(key) {
-        last.tone = Tone::None;
-        last.tone_key = None;
+    } else if last.tone_key == Some(key) {
+        if restore_keys {
+            last.tone = Tone::None;
+            last.tone_key = None;
+        }
         false
     } else {
         last.tone = tone;

@@ -26,8 +26,8 @@ enum Command {
     /// Compose raw keystrokes into display text.
     Compose {
         /// Layout: en, telex, vni, or viqr.
-        #[arg(short, long, default_value = "telex", value_parser = parse_layout)]
-        layout: Layout,
+        #[arg(short, long, value_parser = parse_layout)]
+        layout: Option<Layout>,
         /// Raw keystrokes. Read stdin when omitted.
         text: Option<String>,
         /// Disable repeated-modifier restore behaviour (for example, `ass` -> `ás`).
@@ -37,14 +37,14 @@ enum Command {
     /// Open the native Wayland GUI control panel.
     Gui {
         /// Initial layout.
-        #[arg(short, long, default_value = "telex", value_parser = parse_layout)]
-        layout: Layout,
+        #[arg(short, long, value_parser = parse_layout)]
+        layout: Option<Layout>,
     },
     /// Run the native Wayland input-method service.
     InputMethod {
         /// Layout used while the service is active.
-        #[arg(short, long, default_value = "telex", value_parser = parse_layout)]
-        layout: Layout,
+        #[arg(short, long, value_parser = parse_layout)]
+        layout: Option<Layout>,
     },
     /// Inspect the Wayland session and distro-specific capabilities.
     Doctor,
@@ -67,6 +67,8 @@ pub fn run() -> io::Result<()> {
             Ok(())
         }
         Command::Compose { layout, text, no_restore_keys } => {
+            let config = Config::load()?;
+            let layout = layout.unwrap_or(config.layout);
             let from_argument = text.is_some();
             let raw = match text {
                 Some(text) => text,
@@ -82,7 +84,9 @@ pub fn run() -> io::Result<()> {
                     ))
                 }
             };
-            let options = crate::layout::ComposerOptions { restore_keys: !no_restore_keys };
+            let options = crate::layout::ComposerOptions {
+                restore_keys: config.restore_keys && !no_restore_keys,
+            };
             let composed = crate::layout::compose_with_options(layout, &raw, options);
             let stdout = io::stdout();
             let mut stdout = stdout.lock();
@@ -92,8 +96,15 @@ pub fn run() -> io::Result<()> {
             }
             Ok(())
         }
-        Command::Gui { layout } => crate::gui::run(layout),
-        Command::InputMethod { layout } => crate::wayland::input_method::InputMethodService::new(layout).run(),
+        Command::Gui { layout } => {
+            let config = Config::load()?;
+            crate::gui::run(layout.unwrap_or(config.layout))
+        }
+        Command::InputMethod { layout } => {
+            let config = Config::load()?;
+            crate::wayland::input_method::InputMethodService::new(layout.unwrap_or(config.layout))
+                .run()
+        }
         Command::Doctor => doctor(),
         Command::ConfigShow => {
             print!("{}", Config::load()?.render());
@@ -134,7 +145,7 @@ fn parse_bool(value: &str) -> io::Result<bool> {
 }
 
 fn doctor() -> io::Result<()> {
-    println!("UniKey RS          0.1.0 (0.x beta)");
+    println!("UniKey RS          {} (0.x beta)", env!("CARGO_PKG_VERSION"));
     println!("OS                 {}", read_os_name().unwrap_or_else(|| "unknown Linux".to_owned()));
     println!("Session type       {}", env_or("XDG_SESSION_TYPE", "unknown"));
     println!("Desktop            {}", env_or("XDG_CURRENT_DESKTOP", "unknown"));
