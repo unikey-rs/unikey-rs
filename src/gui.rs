@@ -261,25 +261,25 @@ fn draw(state: &GuiState) -> Vec<u8> {
     let mut pixels = vec![0u8; (WIDTH * HEIGHT * 4) as usize];
     fill(&mut pixels, 0, 0, WIDTH, HEIGHT, BG);
     fill(&mut pixels, 0, 0, WIDTH, 74, BLUE);
-    text_fit(&mut pixels, 34, 25, 520, "UNIKEY RS", 30, 0xffffffff);
+    text_fit(&mut pixels, 34, 18, 520, "UNIKEY RS", 13, 0xffffffff);
     let ui = state.language.strings();
-    text_fit(&mut pixels, 620, 27, 165, ui.wayland_native, 15, GREEN);
+    text_fit(&mut pixels, 620, 22, 165, ui.wayland_native, 8, GREEN);
 
-    text_fit(&mut pixels, 40, 108, 500, ui.composer_layout, 17, INK);
+    text_fit(&mut pixels, 40, 105, 500, ui.composer_layout, 10, INK);
     button(&mut pixels, 40, 150, 165, 72, state.language.layout_short(Layout::English), state.layout == Layout::English);
     button(&mut pixels, 225, 150, 165, 72, state.language.layout_short(Layout::Telex), state.layout == Layout::Telex);
     button(&mut pixels, 410, 150, 165, 72, state.language.layout_short(Layout::Vni), state.layout == Layout::Vni);
     button(&mut pixels, 595, 150, 185, 72, state.language.layout_short(Layout::Viqr), state.layout == Layout::Viqr);
 
-    text_fit(&mut pixels, 40, 265, 400, ui.type_here, 17, INK);
+    text_fit(&mut pixels, 40, 265, 400, ui.type_here, 10, INK);
     fill(&mut pixels, 40, 292, 740, 68, 0xffffffff);
     outline(&mut pixels, 40, 292, 740, 68, 0xffc9ced3);
     let output = state.composer.output();
     let typed = state.composer.typed();
-    text_fit(&mut pixels, 58, 307, 700, &format!("{}  {}", ui.raw, tail(typed, 42)), 15, 0xff69727b);
-    text_fit(&mut pixels, 58, 334, 700, &format!("{}  {}", ui.output, tail(&output, 42)), 16, INK);
+    text_fit(&mut pixels, 58, 302, 700, &format!("{}  {}", ui.raw, tail(typed, 42)), 9, 0xff69727b);
+    text_fit(&mut pixels, 58, 332, 700, &format!("{}  {}", ui.output, tail(&output, 42)), 9, INK);
 
-    text_fit(&mut pixels, 40, 405, 570, ui.click_help, 11, 0xff69727b);
+    text_fit(&mut pixels, 40, 407, 570, ui.click_help, 5, 0xff69727b);
     button(&mut pixels, 650, 430, 130, 65, ui.quit, false);
     pixels
 }
@@ -288,7 +288,7 @@ fn button(pixels: &mut [u8], x: u32, y: u32, w: u32, h: u32, label: &str, active
     let color = if active { ORANGE } else { 0xffffffff };
     fill(pixels, x, y, w, h, color);
     outline(pixels, x, y, w, h, if active { ORANGE } else { 0xffaeb7bf });
-    text_fit(pixels, x + 12, y + 24, w.saturating_sub(24), label, 18, if active { 0xffffffff } else { INK });
+    text_fit(pixels, x + 12, y + 8, w.saturating_sub(24), label, 10, if active { 0xffffffff } else { INK });
 }
 
 fn fill(pixels: &mut [u8], x: u32, y: u32, w: u32, h: u32, color: u32) {
@@ -356,27 +356,151 @@ fn missing(interface: &str) -> io::Error {
     io::Error::new(io::ErrorKind::NotFound, format!("Wayland global `{interface}` is unavailable"))
 }
 
-fn font_key(ch: char) -> char {
-    for (characters, base) in [
-        ("aáàảãạăắằẳẵặâấầẩẫậ", 'A'),
-        ("eéèẻẽẹêếềểễệ", 'E'),
-        ("iíìỉĩị", 'I'),
-        ("oóòỏõọôốồổỗộơớờởỡợ", 'O'),
-        ("uúùủũụưứừửữự", 'U'),
-        ("yýỳỷỹỵ", 'Y'),
-        ("dđ", 'D'),
-    ] {
-        if characters.contains(ch) {
-            return base;
-        }
-    }
-    ch.to_ascii_uppercase()
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum AccentShape {
+    None,
+    Circumflex,
+    Breve,
+    Horn,
+    Stroke,
 }
 
-/// 5x7 bitmap font. Vietnamese accents share their base-letter bitmap in this
-/// compact software renderer; the source labels and CLI remain fully accented.
-fn glyph(ch: char) -> [u8; 7] {
-    match font_key(ch) {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum AccentTone {
+    None,
+    Acute,
+    Grave,
+    Hook,
+    Tilde,
+    Dot,
+}
+
+fn glyph(ch: char) -> [u8; 11] {
+    let (base, shape, tone) = font_parts(ch);
+    let mut rows = [0u8; 11];
+    let mut row = 0;
+    if shape != AccentShape::None {
+        rows[row..row + 2].copy_from_slice(&shape_rows(shape));
+        row += 2;
+    }
+    if tone != AccentTone::None {
+        rows[row..row + 2].copy_from_slice(&tone_rows(tone));
+        row += 2;
+    }
+    rows[row..row + 7].copy_from_slice(&base_glyph(base));
+    rows
+}
+
+fn font_parts(ch: char) -> (char, AccentShape, AccentTone) {
+    let lower = ch.to_lowercase().next().unwrap_or(ch);
+    let (base, shape, tone) = match lower {
+        'à' => ('a', AccentShape::None, AccentTone::Grave),
+        'á' => ('a', AccentShape::None, AccentTone::Acute),
+        'â' => ('a', AccentShape::Circumflex, AccentTone::None),
+        'ã' => ('a', AccentShape::None, AccentTone::Tilde),
+        'è' => ('e', AccentShape::None, AccentTone::Grave),
+        'é' => ('e', AccentShape::None, AccentTone::Acute),
+        'ê' => ('e', AccentShape::Circumflex, AccentTone::None),
+        'ì' => ('i', AccentShape::None, AccentTone::Grave),
+        'í' => ('i', AccentShape::None, AccentTone::Acute),
+        'î' => ('i', AccentShape::Circumflex, AccentTone::None),
+        'ò' => ('o', AccentShape::None, AccentTone::Grave),
+        'ó' => ('o', AccentShape::None, AccentTone::Acute),
+        'ô' => ('o', AccentShape::Circumflex, AccentTone::None),
+        'õ' => ('o', AccentShape::None, AccentTone::Tilde),
+        'ù' => ('u', AccentShape::None, AccentTone::Grave),
+        'ú' => ('u', AccentShape::None, AccentTone::Acute),
+        'û' => ('u', AccentShape::Circumflex, AccentTone::None),
+        'ý' => ('y', AccentShape::None, AccentTone::Acute),
+        'ă' => ('a', AccentShape::Breve, AccentTone::None),
+        'ĕ' => ('e', AccentShape::Breve, AccentTone::None),
+        'ĩ' => ('i', AccentShape::None, AccentTone::Tilde),
+        'ĭ' => ('i', AccentShape::Breve, AccentTone::None),
+        'ŏ' => ('o', AccentShape::Breve, AccentTone::None),
+        'ũ' => ('u', AccentShape::None, AccentTone::Tilde),
+        'ŭ' => ('u', AccentShape::Breve, AccentTone::None),
+        'ŷ' => ('y', AccentShape::Circumflex, AccentTone::None),
+        'ơ' => ('o', AccentShape::Horn, AccentTone::None),
+        'ư' => ('u', AccentShape::Horn, AccentTone::None),
+        'ḍ' => ('d', AccentShape::None, AccentTone::Dot),
+        'ṍ' => ('o', AccentShape::None, AccentTone::Acute),
+        'ṹ' => ('u', AccentShape::None, AccentTone::Acute),
+        'ạ' => ('a', AccentShape::None, AccentTone::Dot),
+        'ả' => ('a', AccentShape::None, AccentTone::Hook),
+        'ấ' => ('a', AccentShape::Circumflex, AccentTone::Acute),
+        'ầ' => ('a', AccentShape::Circumflex, AccentTone::Grave),
+        'ẩ' => ('a', AccentShape::Circumflex, AccentTone::Hook),
+        'ẫ' => ('a', AccentShape::Circumflex, AccentTone::Tilde),
+        'ậ' => ('a', AccentShape::Circumflex, AccentTone::Dot),
+        'ắ' => ('a', AccentShape::Breve, AccentTone::Acute),
+        'ằ' => ('a', AccentShape::Breve, AccentTone::Grave),
+        'ẳ' => ('a', AccentShape::Breve, AccentTone::Hook),
+        'ẵ' => ('a', AccentShape::Breve, AccentTone::Tilde),
+        'ặ' => ('a', AccentShape::Breve, AccentTone::Dot),
+        'ẹ' => ('e', AccentShape::None, AccentTone::Dot),
+        'ẻ' => ('e', AccentShape::None, AccentTone::Hook),
+        'ẽ' => ('e', AccentShape::None, AccentTone::Tilde),
+        'ế' => ('e', AccentShape::Circumflex, AccentTone::Acute),
+        'ề' => ('e', AccentShape::Circumflex, AccentTone::Grave),
+        'ể' => ('e', AccentShape::Circumflex, AccentTone::Hook),
+        'ễ' => ('e', AccentShape::Circumflex, AccentTone::Tilde),
+        'ệ' => ('e', AccentShape::Circumflex, AccentTone::Dot),
+        'ỉ' => ('i', AccentShape::None, AccentTone::Hook),
+        'ị' => ('i', AccentShape::None, AccentTone::Dot),
+        'ọ' => ('o', AccentShape::None, AccentTone::Dot),
+        'ỏ' => ('o', AccentShape::None, AccentTone::Hook),
+        'ố' => ('o', AccentShape::Circumflex, AccentTone::Acute),
+        'ồ' => ('o', AccentShape::Circumflex, AccentTone::Grave),
+        'ổ' => ('o', AccentShape::Circumflex, AccentTone::Hook),
+        'ỗ' => ('o', AccentShape::Circumflex, AccentTone::Tilde),
+        'ộ' => ('o', AccentShape::Circumflex, AccentTone::Dot),
+        'ớ' => ('o', AccentShape::Horn, AccentTone::Acute),
+        'ờ' => ('o', AccentShape::Horn, AccentTone::Grave),
+        'ở' => ('o', AccentShape::Horn, AccentTone::Hook),
+        'ỡ' => ('o', AccentShape::Horn, AccentTone::Tilde),
+        'ợ' => ('o', AccentShape::Horn, AccentTone::Dot),
+        'ụ' => ('u', AccentShape::None, AccentTone::Dot),
+        'ủ' => ('u', AccentShape::None, AccentTone::Hook),
+        'ứ' => ('u', AccentShape::Horn, AccentTone::Acute),
+        'ừ' => ('u', AccentShape::Horn, AccentTone::Grave),
+        'ử' => ('u', AccentShape::Horn, AccentTone::Hook),
+        'ữ' => ('u', AccentShape::Horn, AccentTone::Tilde),
+        'ự' => ('u', AccentShape::Horn, AccentTone::Dot),
+        'ỳ' => ('y', AccentShape::None, AccentTone::Grave),
+        'ỵ' => ('y', AccentShape::None, AccentTone::Dot),
+        'ỷ' => ('y', AccentShape::None, AccentTone::Hook),
+        'ỹ' => ('y', AccentShape::None, AccentTone::Tilde),
+        'đ' => ('d', AccentShape::Stroke, AccentTone::None),
+        other => (other, AccentShape::None, AccentTone::None),
+    };
+    let base = if ch.is_uppercase() { base.to_ascii_uppercase() } else { base };
+    (base, shape, tone)
+}
+
+fn shape_rows(shape: AccentShape) -> [u8; 2] {
+    match shape {
+        AccentShape::None => [0, 0],
+        AccentShape::Circumflex => [0b00100, 0b01010],
+        AccentShape::Breve => [0b01010, 0b00100],
+        AccentShape::Horn => [0b00010, 0b00100],
+        AccentShape::Stroke => [0b00000, 0b01110],
+    }
+}
+
+fn tone_rows(tone: AccentTone) -> [u8; 2] {
+    match tone {
+        AccentTone::None => [0, 0],
+        AccentTone::Acute => [0b00010, 0b00100],
+        AccentTone::Grave => [0b00100, 0b00010],
+        AccentTone::Hook => [0b01000, 0b00100],
+        AccentTone::Tilde => [0b01010, 0b00100],
+        AccentTone::Dot => [0b00000, 0b00100],
+    }
+}
+
+/// Base 5x7 bitmap shapes used by the compact software font.
+fn base_glyph(ch: char) -> [u8; 7] {
+    match ch.to_ascii_uppercase() {
         'A' => [0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001],
         'B' => [0b11110, 0b10001, 0b10001, 0b11110, 0b10001, 0b10001, 0b11110],
         'C' => [0b01110, 0b10001, 0b10000, 0b10000, 0b10000, 0b10001, 0b01110],
@@ -421,5 +545,27 @@ fn glyph(ch: char) -> [u8; 7] {
         '/' => [0b00001, 0b00010, 0b00010, 0b00100, 0b01000, 0b01000, 0b10000],
         ' ' => [0; 7],
         _ => [0b11111, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b11111],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn vietnamese_glyphs_keep_shape_and_tone_marks() {
+        let (base, shape, tone) = font_parts('ấ');
+        assert_eq!(base, 'a');
+        assert_eq!(shape, AccentShape::Circumflex);
+        assert_eq!(tone, AccentTone::Acute);
+        assert_ne!(glyph('ấ'), glyph('a'));
+    }
+
+    #[test]
+    fn uppercase_vietnamese_uses_uppercase_base() {
+        let (base, shape, tone) = font_parts('Ư');
+        assert_eq!(base, 'U');
+        assert_eq!(shape, AccentShape::Horn);
+        assert_eq!(tone, AccentTone::None);
     }
 }

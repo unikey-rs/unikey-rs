@@ -37,9 +37,9 @@ unikey-rs config-set language vi
 ## AppImage trên Fedora Atomic
 
 ```sh
-chmod +x UniKey_RS-0.1.2-x86_64.AppImage
-./UniKey_RS-0.1.2-x86_64.AppImage doctor
-./UniKey_RS-0.1.2-x86_64.AppImage gui
+chmod +x UniKey_RS-0.1.3-x86_64.AppImage
+./UniKey_RS-0.1.3-x86_64.AppImage doctor
+./UniKey_RS-0.1.3-x86_64.AppImage gui
 ```
 
 Không cần cài system package và không ghi vào `/usr`. Xem `docs/FEDORA_ATOMIC.md` để tích hợp desktop ở cấp người dùng.

@@ -79,9 +79,9 @@ No system installation is required. Download the AppImage, make it executable,
 and run it from your home directory:
 
 ```sh
-chmod +x UniKey_RS-0.1.2-x86_64.AppImage
-./UniKey_RS-0.1.2-x86_64.AppImage doctor
-./UniKey_RS-0.1.2-x86_64.AppImage gui
+chmod +x UniKey_RS-0.1.3-x86_64.AppImage
+./UniKey_RS-0.1.3-x86_64.AppImage doctor
+./UniKey_RS-0.1.3-x86_64.AppImage gui
 ```
 
 The build prefers a static `x86_64-unknown-linux-musl` binary when available.

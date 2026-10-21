@@ -2,6 +2,11 @@
 
 All releases remain on the `0.x` line during active development.
 
+## 0.1.3 — 2026-10-21
+
+- Render Vietnamese shape and tone marks in the native GUI bitmap font.
+- Keep composed preview text visibly accented.
+
 ## 0.1.2 — 2026-10-21
 
 - Make Vietnamese the default user-interface language.
