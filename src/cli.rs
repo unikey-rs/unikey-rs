@@ -1,6 +1,7 @@
 //! Unified command-line surface.
 
 use crate::config::Config;
+use crate::i18n::Language;
 use crate::layout::Layout;
 use crate::wayland;
 use clap::{Parser, Subcommand};
@@ -61,8 +62,14 @@ pub fn run() -> io::Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Command::Layouts => {
+            let language = Config::load().map(|config| config.language).unwrap_or_default();
             for layout in Layout::ALL {
-                println!("{:<7} {:<21} {}", layout.id(), layout.display_name(), layout.description());
+                println!(
+                    "{:<7} {:<21} {}",
+                    layout.id(),
+                    language.layout_name(layout),
+                    language.layout_description(layout)
+                );
             }
             Ok(())
         }
@@ -98,7 +105,7 @@ pub fn run() -> io::Result<()> {
         }
         Command::Gui { layout } => {
             let config = Config::load()?;
-            crate::gui::run(layout.unwrap_or(config.layout))
+            crate::gui::run(layout.unwrap_or(config.layout), config.language)
         }
         Command::InputMethod { layout } => {
             let config = Config::load()?;
@@ -124,10 +131,14 @@ fn set_config(key: &str, value: &str) -> io::Result<()> {
         "layout" => config.layout = Layout::from_str(value).map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?,
         "restore_keys" => config.restore_keys = parse_bool(value)?,
         "daemon" => config.daemon = parse_bool(value)?,
+        "language" => {
+            config.language = Language::from_str(value)
+                .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?
+        }
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "unknown config key; expected layout, restore_keys, or daemon",
+                "unknown config key; expected language, layout, restore_keys, or daemon",
             ))
         }
     }
@@ -145,31 +156,39 @@ fn parse_bool(value: &str) -> io::Result<bool> {
 }
 
 fn doctor() -> io::Result<()> {
-    println!("UniKey RS          {} (0.x beta)", env!("CARGO_PKG_VERSION"));
-    println!("OS                 {}", read_os_name().unwrap_or_else(|| "unknown Linux".to_owned()));
-    println!("Session type       {}", env_or("XDG_SESSION_TYPE", "unknown"));
-    println!("Desktop            {}", env_or("XDG_CURRENT_DESKTOP", "unknown"));
-    println!("Wayland display    {}", env_or("WAYLAND_DISPLAY", "wayland-0"));
-    println!("XDG_RUNTIME_DIR    {}", env_or("XDG_RUNTIME_DIR", "<missing>"));
-    println!("Platform note      immutable distros (Fedora Atomic, Silverblue, COSMIC Atomic) supported via AppImage");
+    let language = Config::load().map(|config| config.language).unwrap_or_default();
+    let text = language.strings();
+    println!("{}          {} (0.x beta)", text.doctor_title, env!("CARGO_PKG_VERSION"));
+    println!("{:<20} {}", text.os, read_os_name().unwrap_or_else(|| "unknown Linux".to_owned()));
+    println!("{:<20} {}", text.session_type, env_or("XDG_SESSION_TYPE", "unknown"));
+    println!("{:<20} {}", text.desktop, env_or("XDG_CURRENT_DESKTOP", "unknown"));
+    println!("{:<20} {}", text.wayland_display, env_or("WAYLAND_DISPLAY", "wayland-0"));
+    println!("{:<20} {}", text.runtime_dir, env_or("XDG_RUNTIME_DIR", "<missing>"));
+    println!("{:<20} Fedora Atomic / Silverblue / COSMIC Atomic", text.platform_note);
 
     match wayland::socket_path() {
-        Ok(path) => println!("Wayland socket     {} ({})", path.display(), if path.exists() { "found" } else { "missing" }),
-        Err(error) => println!("Wayland socket     error: {error}"),
+        Ok(path) => println!(
+            "{:<20} {} ({})",
+            text.wayland_socket,
+            path.display(),
+            if path.exists() { "found" } else { "missing" }
+        ),
+        Err(error) => println!("{:<20} error: {error}", text.wayland_socket),
     }
 
     match wayland::probe_globals() {
         Ok(globals) => {
-            println!("Wayland globals    {}", globals.len());
+            println!("{:<20} {}", text.wayland_globals, globals.len());
             for global in &globals {
                 println!("  {:<32} v{:<2} id={}", global.interface, global.version, global.name);
             }
             let im_v2 = globals.iter().any(|global| global.interface == "zwp_input_method_manager_v2");
             let im_v1 = globals.iter().any(|global| global.interface == "zwp_input_method_v1");
-            println!("Input method v2    {}", if im_v2 { "available" } else { "not advertised" });
-            println!("Input method v1    {}", if im_v1 { "available" } else { "not advertised" });
+            let status = |available: bool| if available { text.available } else { text.unavailable };
+            println!("{:<20} {}", text.input_method_v2, status(im_v2));
+            println!("{:<20} {}", text.input_method_v1, status(im_v1));
         }
-        Err(error) => println!("Wayland globals    error: {error}"),
+        Err(error) => println!("{:<20} error: {error}", text.wayland_globals),
     }
     Ok(())
 }

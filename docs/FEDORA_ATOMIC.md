@@ -9,9 +9,9 @@ files.
 
 ```sh
 mkdir -p ~/.local/bin
-cp UniKey_RS-0.1.1-x86_64.AppImage ~/.local/bin/
-chmod +x ~/.local/bin/UniKey_RS-0.1.1-x86_64.AppImage
-~/.local/bin/UniKey_RS-0.1.1-x86_64.AppImage doctor
+cp UniKey_RS-0.1.2-x86_64.AppImage ~/.local/bin/
+chmod +x ~/.local/bin/UniKey_RS-0.1.2-x86_64.AppImage
+~/.local/bin/UniKey_RS-0.1.2-x86_64.AppImage doctor
 ```
 
 ## Optional desktop entry

@@ -2,6 +2,13 @@
 
 All releases remain on the `0.x` line during active development.
 
+## 0.1.2 — 2026-10-21
+
+- Make Vietnamese the default user-interface language.
+- Add compact `vi`/`en` localization for GUI, layouts, and doctor output.
+- Persist language as `language=vi|en` in shared configuration.
+- Add a Vietnamese README.
+
 ## 0.1.1 — 2026-10-20
 
 - Parse compositor-provided XKB keymaps for Wayland GUI and input-method input.

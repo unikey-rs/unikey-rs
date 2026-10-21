@@ -3,6 +3,7 @@
 //! Configuration is intentionally human-editable and forward compatible:
 //! unknown keys are preserved by callers that round-trip the file.
 
+use crate::i18n::Language;
 use crate::layout::Layout;
 use std::fs;
 use std::io;
@@ -10,6 +11,7 @@ use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Config {
+    pub language: Language,
     pub layout: Layout,
     pub restore_keys: bool,
     pub daemon: bool,
@@ -18,6 +20,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            language: Language::default(),
             layout: Layout::Telex,
             restore_keys: true,
             daemon: false,
@@ -75,6 +78,11 @@ impl Config {
             };
             let value = value.trim();
             match key.trim() {
+                "language" => {
+                    if let Ok(language) = value.parse() {
+                        config.language = language;
+                    }
+                }
                 "layout" => {
                     if let Ok(layout) = value.parse() {
                         config.layout = layout;
@@ -90,7 +98,8 @@ impl Config {
 
     pub fn render(&self) -> String {
         format!(
-            "# unikey-rs configuration\nlayout={}\nrestore_keys={}\ndaemon={}\n",
+            "# unikey-rs configuration\nlanguage={}\nlayout={}\nrestore_keys={}\ndaemon={}\n",
+            self.language.id(),
             self.layout.id(),
             self.restore_keys,
             self.daemon
@@ -113,11 +122,13 @@ mod tests {
     #[test]
     fn round_trips_known_and_ignores_unknown_values() {
         let config = Config {
+            language: Language::English,
             layout: Layout::Vni,
             restore_keys: false,
             daemon: true,
         };
         let rendered = config.render();
+        assert!(rendered.contains("language=en"));
         assert!(rendered.contains("layout=vni"));
         assert_eq!(Config::parse(&rendered), config);
 

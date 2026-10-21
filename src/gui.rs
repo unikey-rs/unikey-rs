@@ -4,6 +4,7 @@
 //! tiny software canvas instead of GTK/Qt so the AppImage has no toolkit
 //! runtime and the same layout engine can be exercised interactively.
 
+use crate::i18n::Language;
 use crate::layout::{Composer, Layout};
 use crate::wayland::xkb::Keymap;
 use crate::wayland::{Connection, Decoder, Encoder, Event};
@@ -19,7 +20,7 @@ const BLUE: u32 = 0xff2463a7;
 const ORANGE: u32 = 0xffc7662c;
 const GREEN: u32 = 0xff2e8b67;
 
-pub fn run(initial: Layout) -> io::Result<()> {
+pub fn run(initial: Layout, language: Language) -> io::Result<()> {
     let mut connection = Connection::connect()?;
     let globals = connection.registry()?;
     let compositor = globals.iter().find(|g| g.interface == "wl_compositor").ok_or_else(|| missing("wl_compositor"))?;
@@ -54,6 +55,7 @@ pub fn run(initial: Layout) -> io::Result<()> {
     let mut state = GuiState {
         composer: Composer::new(initial),
         layout: initial,
+        language,
         keymap: Keymap::default(),
         shift: false,
         cursor_x: 0.0,
@@ -84,6 +86,7 @@ pub fn run(initial: Layout) -> io::Result<()> {
 struct GuiState {
     composer: Composer,
     layout: Layout,
+    language: Language,
     keymap: Keymap,
     shift: bool,
     cursor_x: f64,
@@ -258,25 +261,26 @@ fn draw(state: &GuiState) -> Vec<u8> {
     let mut pixels = vec![0u8; (WIDTH * HEIGHT * 4) as usize];
     fill(&mut pixels, 0, 0, WIDTH, HEIGHT, BG);
     fill(&mut pixels, 0, 0, WIDTH, 74, BLUE);
-    text(&mut pixels, 34, 25, "UNIKEY RS", 30, 0xffffffff);
-    text(&mut pixels, 620, 27, "WAYLAND NATIVE", 18, GREEN);
+    text_fit(&mut pixels, 34, 25, 520, "UNIKEY RS", 30, 0xffffffff);
+    let ui = state.language.strings();
+    text_fit(&mut pixels, 620, 27, 165, ui.wayland_native, 15, GREEN);
 
-    text(&mut pixels, 40, 108, "COMPOSER LAYOUT", 19, INK);
-    button(&mut pixels, 40, 150, 165, 72, "ENGLISH", state.layout == Layout::English);
-    button(&mut pixels, 225, 150, 165, 72, "TELEX", state.layout == Layout::Telex);
-    button(&mut pixels, 410, 150, 165, 72, "VNI", state.layout == Layout::Vni);
-    button(&mut pixels, 595, 150, 185, 72, "VIQR", state.layout == Layout::Viqr);
+    text_fit(&mut pixels, 40, 108, 500, ui.composer_layout, 17, INK);
+    button(&mut pixels, 40, 150, 165, 72, state.language.layout_short(Layout::English), state.layout == Layout::English);
+    button(&mut pixels, 225, 150, 165, 72, state.language.layout_short(Layout::Telex), state.layout == Layout::Telex);
+    button(&mut pixels, 410, 150, 165, 72, state.language.layout_short(Layout::Vni), state.layout == Layout::Vni);
+    button(&mut pixels, 595, 150, 185, 72, state.language.layout_short(Layout::Viqr), state.layout == Layout::Viqr);
 
-    text(&mut pixels, 40, 265, "TYPE HERE", 19, INK);
+    text_fit(&mut pixels, 40, 265, 400, ui.type_here, 17, INK);
     fill(&mut pixels, 40, 292, 740, 68, 0xffffffff);
     outline(&mut pixels, 40, 292, 740, 68, 0xffc9ced3);
     let output = state.composer.output();
     let typed = state.composer.typed();
-    text(&mut pixels, 58, 307, &format!("RAW  {}", tail(typed, 42)), 17, 0xff69727b);
-    text(&mut pixels, 58, 334, &format!("OUT  {}", tail(&output, 42)), 19, INK);
+    text_fit(&mut pixels, 58, 307, 700, &format!("{}  {}", ui.raw, tail(typed, 42)), 15, 0xff69727b);
+    text_fit(&mut pixels, 58, 334, 700, &format!("{}  {}", ui.output, tail(&output, 42)), 16, INK);
 
-    text(&mut pixels, 40, 405, "Click a layout or press 1-4. Backspace edits the preview.", 17, 0xff69727b);
-    button(&mut pixels, 650, 430, 130, 65, "QUIT", false);
+    text_fit(&mut pixels, 40, 405, 570, ui.click_help, 11, 0xff69727b);
+    button(&mut pixels, 650, 430, 130, 65, ui.quit, false);
     pixels
 }
 
@@ -284,7 +288,7 @@ fn button(pixels: &mut [u8], x: u32, y: u32, w: u32, h: u32, label: &str, active
     let color = if active { ORANGE } else { 0xffffffff };
     fill(pixels, x, y, w, h, color);
     outline(pixels, x, y, w, h, if active { ORANGE } else { 0xffaeb7bf });
-    text(pixels, x + 18, y + 24, label, 18, if active { 0xffffffff } else { INK });
+    text_fit(pixels, x + 12, y + 24, w.saturating_sub(24), label, 18, if active { 0xffffffff } else { INK });
 }
 
 fn fill(pixels: &mut [u8], x: u32, y: u32, w: u32, h: u32, color: u32) {
@@ -312,6 +316,14 @@ fn put_pixel(pixels: &mut [u8], x: u32, y: u32, color: u32) {
     }
 }
 
+fn text_fit(pixels: &mut [u8], x: u32, y: u32, max_width: u32, value: &str, max_scale: u32, color: u32) {
+    let chars = value.chars().count().max(1) as u32;
+    let scale = max_scale
+        .min((max_width / chars) * 2 / 5)
+        .max(1);
+    text(pixels, x, y, value, scale, color);
+}
+
 fn text(pixels: &mut [u8], x: u32, y: u32, value: &str, scale: u32, color: u32) {
     let mut cursor = x;
     for ch in value.chars() {
@@ -323,7 +335,7 @@ fn text(pixels: &mut [u8], x: u32, y: u32, value: &str, scale: u32, color: u32) 
                 }
             }
         }
-        cursor += 4 * scale / 2;
+        cursor += 5 * scale / 2;
     }
 }
 
@@ -344,9 +356,27 @@ fn missing(interface: &str) -> io::Error {
     io::Error::new(io::ErrorKind::NotFound, format!("Wayland global `{interface}` is unavailable"))
 }
 
-/// 5x7 bitmap font. Unknown characters are rendered as a small box.
+fn font_key(ch: char) -> char {
+    for (characters, base) in [
+        ("aáàảãạăắằẳẵặâấầẩẫậ", 'A'),
+        ("eéèẻẽẹêếềểễệ", 'E'),
+        ("iíìỉĩị", 'I'),
+        ("oóòỏõọôốồổỗộơớờởỡợ", 'O'),
+        ("uúùủũụưứừửữự", 'U'),
+        ("yýỳỷỹỵ", 'Y'),
+        ("dđ", 'D'),
+    ] {
+        if characters.contains(ch) {
+            return base;
+        }
+    }
+    ch.to_ascii_uppercase()
+}
+
+/// 5x7 bitmap font. Vietnamese accents share their base-letter bitmap in this
+/// compact software renderer; the source labels and CLI remain fully accented.
 fn glyph(ch: char) -> [u8; 7] {
-    match ch.to_ascii_uppercase() {
+    match font_key(ch) {
         'A' => [0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001],
         'B' => [0b11110, 0b10001, 0b10001, 0b11110, 0b10001, 0b10001, 0b11110],
         'C' => [0b01110, 0b10001, 0b10000, 0b10000, 0b10000, 0b10001, 0b01110],

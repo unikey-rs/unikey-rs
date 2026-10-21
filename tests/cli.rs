@@ -88,3 +88,37 @@ fn respects_restore_keys_config() {
     assert_eq!(stdout(&output), "ás\n");
     let _ = std::fs::remove_file(path);
 }
+
+#[test]
+fn vietnamese_is_the_default_ui_language() {
+    let path = std::env::temp_dir().join(format!("unikey-rs-language-vi-{}", std::process::id()));
+    let mut config = std::fs::File::create(&path).expect("create config");
+    config.write_all(b"language=vi\nlayout=telex\n").expect("write config");
+
+    let output = binary()
+        .env("UNIKEY_RS_CONFIG", &path)
+        .arg("layouts")
+        .output()
+        .expect("localized layouts");
+    assert!(stdout(&output).contains("Tiếng Việt Telex"));
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn language_can_be_switched_to_english() {
+    let path = std::env::temp_dir().join(format!("unikey-rs-language-en-{}", std::process::id()));
+    let output = binary()
+        .env("UNIKEY_RS_CONFIG", &path)
+        .args(["config-set", "language", "en"])
+        .output()
+        .expect("set language");
+    assert!(output.status.success());
+
+    let output = binary()
+        .env("UNIKEY_RS_CONFIG", &path)
+        .arg("config-show")
+        .output()
+        .expect("show language");
+    assert!(stdout(&output).contains("language=en"));
+    let _ = std::fs::remove_file(path);
+}

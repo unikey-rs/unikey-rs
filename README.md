@@ -1,5 +1,7 @@
 # UniKey RS
 
+[Tiếng Việt](README.vi.md) | English
+
 **Beta identity: `UniKey RS`. Version line: `0.x`.**
 
 UniKey RS is a Rust text composer with a unified CLI and a dependency-free,
@@ -77,9 +79,9 @@ No system installation is required. Download the AppImage, make it executable,
 and run it from your home directory:
 
 ```sh
-chmod +x UniKey_RS-0.1.1-x86_64.AppImage
-./UniKey_RS-0.1.1-x86_64.AppImage doctor
-./UniKey_RS-0.1.1-x86_64.AppImage gui
+chmod +x UniKey_RS-0.1.2-x86_64.AppImage
+./UniKey_RS-0.1.2-x86_64.AppImage doctor
+./UniKey_RS-0.1.2-x86_64.AppImage gui
 ```
 
 The build prefers a static `x86_64-unknown-linux-musl` binary when available.
@@ -90,6 +92,7 @@ documented in `docs/FEDORA_ATOMIC.md`.
 
 ```sh
 unikey-rs config-show
+unikey-rs config-set language vi
 unikey-rs config-set layout telex
 unikey-rs config-set restore_keys true
 ```
