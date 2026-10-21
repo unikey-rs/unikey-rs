@@ -114,3 +114,5 @@ portability constraints.
 ## License
 
 MIT. See `LICENSE`.
+
+For Gear Lever installation and GitHub updates, see [docs/GEAR_LEVER.md](docs/GEAR_LEVER.md).

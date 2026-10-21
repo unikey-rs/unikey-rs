@@ -47,3 +47,5 @@ Không cần cài system package và không ghi vào `/usr`. Xem `docs/FEDORA_AT
 ## Trạng thái
 
 Đây là bản `0.x` đang phát triển. Chỉ phát hành `1.0` khi sản phẩm cực kỳ trưởng thành, gần như không còn gì cần cập nhật và hỗ trợ tốt Linux, macOS, Windows.
+
+Cài đặt và cập nhật qua Gear Lever: [docs/GEAR_LEVER.md](docs/GEAR_LEVER.md).

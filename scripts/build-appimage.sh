@@ -31,6 +31,9 @@ cp "$ROOT/target/$TARGET/release/unikey-rs" "$APPDIR/usr/bin/"
 cp "$ROOT/packaging/AppRun" "$APPDIR/AppRun"
 cp "$ROOT/packaging/org.unikeyrs.UniKeyRS.desktop" "$APPDIR/"
 cp "$ROOT/packaging/org.unikeyrs.UniKeyRS.desktop" "$APPDIR/usr/share/applications/"
+sed -i "s/@VERSION@/$VERSION/g" \
+    "$APPDIR/org.unikeyrs.UniKeyRS.desktop" \
+    "$APPDIR/usr/share/applications/org.unikeyrs.UniKeyRS.desktop"
 cp "$ROOT/packaging/unikey-rs.svg" "$APPDIR/unikey-rs.svg"
 cp "$ROOT/packaging/unikey-rs.svg" "$APPDIR/usr/share/icons/hicolor/scalable/apps/"
 cp "$ROOT/packaging/org.unikeyrs.UniKeyRS.appdata.xml" "$APPDIR/usr/share/metainfo/"

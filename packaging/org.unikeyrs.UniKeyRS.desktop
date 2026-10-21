@@ -9,3 +9,4 @@ Terminal=false
 Categories=Utility;TextTools;
 Keywords=Vietnamese;Telex;VNI;VIQR;Wayland;Keyboard;
 StartupNotify=true
+X-AppImage-Version=@VERSION@
